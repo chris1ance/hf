@@ -1,0 +1,11 @@
+gradio
+transformers
+tokenizers
+huggingface-hub
+optimum
+accelerate
+bitsandbytes
+safetensors
+flash-attn
+einops
+sentence-transformers

@@ -1,0 +1,12 @@
+configs/api_keys.toml
+__pycache__
+.idea
+.mypy_cache
+.ruff_cache
+dist/
+*.xlsx
+*.docx
+*.pptx
+*.ipynb
+*.gguf
+.env
