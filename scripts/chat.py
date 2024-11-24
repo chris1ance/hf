@@ -160,8 +160,5 @@ chat_interface = gr.ChatInterface(
     ],
 )
 
-with gr.Blocks(css="style.css", fill_height=True) as demo:
-    chat_interface.render()
-
 if __name__ == "__main__":
-    demo.queue(max_size=3).launch()
+    chat_interface.launch()
