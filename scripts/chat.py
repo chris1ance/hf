@@ -24,7 +24,9 @@ model = AutoModelForCausalLM.from_pretrained(
     model_id,
     device_map="auto",
     # attn_implementation="flash_attention_2",
-    quantization_config=BitsAndBytesConfig(load_in_8bit=True),
+    quantization_config=BitsAndBytesConfig(
+        load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16
+    ),
 )
 
 if model_id == "google/gemma-2-9b-it":
