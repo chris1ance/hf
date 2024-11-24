@@ -23,7 +23,7 @@ if not tokenizer.pad_token:
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     device_map="auto",
-    attn_implementation="flash_attention_2",
+    # attn_implementation="flash_attention_2",
     quantization_config=BitsAndBytesConfig(load_in_8bit=True),
 )
 

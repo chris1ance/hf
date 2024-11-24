@@ -11,11 +11,6 @@
 repos:
   - repo: local
     hooks:
-    - id: docformatter
-      name: docformatter
-      entry: docformatter --in-place --recursive
-      language: python
-      types: [python]
     - id: ruff
       name: ruff
       description: "ruff: Python linting"
