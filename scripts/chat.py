@@ -12,7 +12,7 @@ from transformers import (
     TextIteratorStreamer,
 )
 
-model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+model_id = "Qwen/Qwen2.5-7B-Instruct"  # "allenai/Llama-3.1-Tulu-3-8B" #"meta-llama/Meta-Llama-3-8B-Instruct"
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -73,6 +73,7 @@ def generate(
     input_ids = tokenizer.apply_chat_template(
         conversation, add_generation_prompt=True, return_tensors="pt"
     )
+
     if input_ids.shape[1] > MAX_INPUT_TOKEN_LENGTH:
         input_ids = input_ids[:, -MAX_INPUT_TOKEN_LENGTH:]
         gr.Warning(
@@ -83,17 +84,25 @@ def generate(
     streamer = TextIteratorStreamer(
         tokenizer, timeout=30.0, skip_prompt=True, skip_special_tokens=True
     )
+
     generate_kwargs = dict(
-        {"input_ids": input_ids},
+        input_ids=input_ids,
         streamer=streamer,
         max_new_tokens=max_new_tokens,
         do_sample=do_sample,
-        top_p=top_p,
-        top_k=top_k,
-        temperature=temperature,
         num_beams=num_beams,
         repetition_penalty=repetition_penalty,
     )
+
+    if do_sample:
+        generate_kwargs.update(
+            {
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+            }
+        )
+
     t = Thread(target=model.generate, kwargs=generate_kwargs)
     t.start()
 
