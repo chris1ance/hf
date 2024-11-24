@@ -29,18 +29,6 @@ model = AutoModelForCausalLM.from_pretrained(
     ),
 )
 
-if model_id == "google/gemma-2-9b-it":
-    from transformers import GemmaTokenizerFast
-
-    model.config.sliding_window = 4096
-    tokenizer = GemmaTokenizerFast.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        device_map="auto",
-        # attn_implementation="flash_attention_2",   # gemma-2-9b-it currently does not work with flash_attention_2
-        quantization_config=BitsAndBytesConfig(load_in_8bit=True),
-    )
-
 model.eval()
 
 MAX_INPUT_TOKEN_LENGTH = model.config.max_position_embeddings
