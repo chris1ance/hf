@@ -11,3 +11,4 @@ dist/
 *.gguf
 .env
 .ipynb_checkpoints
+archived/
