@@ -15,6 +15,7 @@ Classes:
     types of models, such as handling model quantization and providing interfaces for generating text responses.
 """
 
+import copy
 import gc
 from typing import TypedDict
 
@@ -29,125 +30,80 @@ from transformers import (
 
 ########################################################################################
 
-# Type alias for a single chat message tuple (user message, assistant message)
-ChatMessage = tuple[str, str]
 
-# Type alias for the chat history, which is a list of chat messages
-ChatHistory = list[ChatMessage]
-
-
-# Type alias for a conversation entry (role: "user" or "assistant", content: message content)
+# Type alias for a conversation entry
 class ConversationEntry(TypedDict):
-    """Type alias for a conversation entry (role: "user" or "assistant", content: message content)."""
+    """Type alias for a conversation entry.
 
-    role: str
-    content: str
+    Example 1 (role = user):
+    {"role": "system", "content": "You are a helpful assistant."}
+
+    Example 2 (role = user):
+    {"role": "user", "content": "Hello, how are you?"}
+
+    Example 3 (role = assistant):
+    {"role": "assistant", "content": "I'm doing well, thank you for asking!"}
+    """
+
+    role: str  # One of: "system" | "user" | "assistant"
+    content: str  # The actual message content
+
+
+def validate_conversation_entry(entry: ConversationEntry) -> None:
+    """Validate that an entry matches the ConversationEntry type specification.
+
+    Raises:
+        TypeError: If entry is not a dict or has wrong value types
+        KeyError: If entry is missing required keys
+        ValueError: If role or content values are invalid
+
+    """
+    # Check if entry is a dictionary
+    if not isinstance(entry, dict):
+        raise TypeError(f"Entry must be a dictionary, got {type(entry)}")
+
+    # Check for required keys
+    if "role" not in entry:
+        raise KeyError("Entry missing required 'role' field")
+    if "content" not in entry:
+        raise KeyError("Entry missing required 'content' field")
+
+    # Check for extra keys
+    extra_keys = set(entry.keys()) - {"role", "content"}
+    if extra_keys:
+        raise ValueError(f"Entry contains unexpected fields: {extra_keys}")
+
+    # Check value types
+    if not isinstance(entry["role"], str):
+        raise TypeError(f"'role' must be a string, got {type(entry['role'])}")
+    if not isinstance(entry["content"], str):
+        raise TypeError(f"'content' must be a string, got {type(entry['content'])}")
+
+    # Validate role value
+    valid_roles = {"system", "user", "assistant"}
+    if entry["role"] not in valid_roles:
+        raise ValueError(f"'role' must be one of {valid_roles}, got '{entry['role']}'")
+
+    # Check content is not empty
+    if not entry["content"].strip():
+        raise ValueError("'content' cannot be empty or only whitespace")
 
 
 # Type alias for a conversation, which is a list of conversation entries
+# Example:
+# conversation = [
+#    {"role": "system", "content": "You are a helpful assistant."},
+#    {"role": "user", "content": "Hello, how are you?"},
+#    {"role": "assistant", "content": "I'm doing well, thank you for asking!"},
+#    {"role": "user", "content": "What's the weather like?"},
+#    {"role": "assistant", "content": "I don't have access to current weather information."}
+# ]
 Conversation = list[ConversationEntry]
 
 ########################################################################################
 
 
-class BaseLLM:
-    """Base class for a language model (LLM) that manages conversation history and system prompts.
-
-    Attributes
-    ----------
-        system_prompt (str | None): Optional initial prompt used to set the context for the conversation.
-        chat_history (list[tuple[str, str]]): List to store the chat history, where each entry is a tuple containing user and assistant messages.
-
-    Methods
-    -------
-        set_system_prompt: Sets the system prompt for the conversation.
-        clear_chat_history: Clears the current chat history.
-        get_chat_history: Retrieves the current chat history.
-        set_chat_history: Sets the chat history to a specified list of message tuples.
-        get_conversation: Converts the chat history to a structured conversation format.
-
-    """
-
-    def set_system_prompt(self, system_prompt: str | None) -> "BaseLLM":
-        """Set the system prompt for the conversation.
-
-        Args:
-        ----
-            system_prompt (str | None): The system prompt to be set. If None, no system prompt is set.
-
-        Returns:
-        -------
-            BaseLLM: An instance of the class with the updated system prompt.
-
-        """
-        if system_prompt:
-            self.system_prompt = system_prompt
-        return self
-
-    def clear_chat_history(self) -> "BaseLLM":
-        """Clear the chat history.
-
-        This method resets the chat history, removing all stored conversation tuples.
-
-        Returns
-        -------
-            BaseLLM: An instance of the class with the chat history cleared.
-
-        """
-        self.chat_history = []
-        return self
-
-    def get_chat_history(self) -> ChatHistory:
-        """Get the current chat history.
-
-        Retrieves the entire chat history as a list of tuples, where each tuple represents a message exchange.
-
-        Returns
-        -------
-            ChatHistory: A list of ChatMessages representing the chat history. Each ChatMessage contains user and assistant messages.
-
-        """
-        return self.chat_history
-
-    def set_chat_history(self, chat_history: ChatHistory) -> "BaseLLM":
-        """Set the chat history to a specific state.
-
-        Args:
-        ----
-            chat_history: A ChatHistory representing the chat history to be set.
-
-        Returns:
-        -------
-            BaseLLM: An instance of the class with the updated chat history.
-
-        """
-        self.chat_history = chat_history
-        return self
-
-    def get_conversation(self) -> Conversation:
-        """Convert the chat history into a structured conversation format.
-
-        Returns
-        -------
-            Conversation: A list of ConversationEntries representing the structured conversation.
-
-        """
-        conversation = []
-
-        if self.system_prompt:
-            conversation.append({"role": "system", "content": self.system_prompt})
-        for user, assistant in self.chat_history:
-            conversation.extend(
-                [{"role": "user", "content": user}, {"role": "assistant", "content": assistant}]
-            )
-
-        return conversation
-
-
-########################################################################################
-
-
-class LLM(BaseLLM):
+class LLM:
     """A class representing a Language Model (LLM) for generating text responses, derived from the BaseLLM class.
 
     This class provides a comprehensive interface for interacting with large language models,
@@ -189,6 +145,10 @@ class LLM(BaseLLM):
     ...     "What is Python?",
     ...     "Explain neural networks"
     ... ])
+
+    References:
+    ----------
+    - Inference examples in https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
 
     """
 
@@ -310,36 +270,130 @@ class LLM(BaseLLM):
         }
 
         # Initialize the chat
-        self.chat_history: ChatHistory = []
+        self.conversation: Conversation = []
         self.system_prompt: str | None = system_prompt
 
-    def print_conversation(self) -> None:
-        """Display the current conversation history in a formatted, human-readable manner.
+        if self.system_prompt:
+            self.conversation.append({"role": "system", "content": self.system_prompt})
 
-        This method prints the entire conversation history, including both user inputs
-        and model responses, using the model's chat template for consistent formatting.
-        It's useful for debugging and reviewing the conversation flow.
+    def set_conversation(self, conversation: Conversation) -> "LLM":
+        """Set the current conversation to the provided conversation list.
+
+        Parameters
+        ----------
+        conversation : Conversation
+            A list of ConversationEntry objects representing the new conversation history
+
+        Returns
+        -------
+        LLM
+            The current LLM instance for method chaining
+
+        Example
+        -------
+        >>> conversation = [
+        ...     {"role": "system", "content": "You are a helpful assistant."},
+        ...     {"role": "user", "content": "Hello!"}
+        ... ]
+        >>> llm.set_conversation(conversation)
+
+        """
+        self.conversation = conversation
+        return self
+
+    def clear_conversation(self) -> "LLM":
+        """Clear the current conversation history.
 
         Returns:
         -------
-        None
+        LLM
+            The current LLM instance for method chaining
 
         Example:
         -------
-        >>> model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-        >>> model = LLM(model_id)
-        >>> model.query_llm("Hello!")
-        >>> model.query_llm("How are you?")
-        >>> model.print_conversation()
+        >>> llm.clear_conversation()
 
         """
-        conversation = self.get_conversation()
-        print(
-            self.tokenizer.apply_chat_template(
-                conversation, add_generation_prompt=False, tokenize=False
+        self.conversation = []
+        return self
+
+    def add_conversation_entry(self, entry: ConversationEntry) -> "LLM":
+        """Add a new entry to the conversation history.
+
+        Parameters
+        ----------
+        entry : ConversationEntry
+            A dictionary containing 'role' and 'content' keys representing the new conversation entry
+
+        Returns
+        -------
+        LLM
+            The current LLM instance for method chaining
+
+        Raises
+        ------
+        Exception
+            If attempting to add a system entry to a non-empty conversation
+        TypeError, KeyError, ValueError
+            If the entry fails validation checks
+
+        Example
+        -------
+        >>> entry = {"role": "user", "content": "What is machine learning?"}
+        >>> llm.add_conversation_entry(entry)
+
+        """
+        validate_conversation_entry(entry)
+
+        if entry["role"] == "system" and not len(self.conversation) == 0:
+            raise Exception(
+                "Trying to insert a system entry in an already populated conversation."
             )
-        )
-        return None
+
+        self.conversation.append(entry)
+        return self
+
+    def get_conversation(
+        self, apply_chat_template: bool = True, add_generation_prompt: bool = False
+    ) -> Conversation | str:
+        """Retrieve the current conversation history.
+
+        Parameters
+        ----------
+        apply_chat_template : bool, optional
+            If True, applies the model's chat template to format the conversation, by default True
+        add_generation_prompt : bool, optional
+            If True and apply_chat_template is True, adds a generation prompt at the end, by default False
+
+        Returns
+        -------
+        Conversation | str
+            Either the raw conversation list or the templated conversation string, depending on apply_chat_template
+
+        Raises
+        ------
+        AssertionError
+            If apply_chat_template is True and the conversation is empty
+
+        Example
+        -------
+        >>> # Get raw conversation
+        >>> conversation = llm.get_conversation(apply_chat_template=False)
+        >>>
+        >>> # Get templated conversation
+        >>> formatted_conversation = llm.get_conversation(apply_chat_template=True)
+
+        """
+        if apply_chat_template:
+            assert self.conversation, "Current conversation is empty."
+
+            templated_conversation = self.tokenizer.apply_chat_template(
+                self.conversation, add_generation_prompt=add_generation_prompt, tokenize=False
+            )
+
+            return templated_conversation
+        else:
+            return self.conversation
 
     def get_model_inputs(self, conversation: Conversation) -> torch.Tensor:
         """Convert a conversation into tokenized inputs suitable for the model.
@@ -420,14 +474,13 @@ class LLM(BaseLLM):
         >>> response = model.query_llm(
         ...     prompt="Write a poem about coding",
         ...     stream=False,
-        ...     temperature=0.8,
-        ...     max_new_tokens=100
+        ...     temperature=0.8
         ... )
 
         """
-        conversation = self.get_conversation()
-        conversation.append({"role": "user", "content": prompt})
-        model_inputs = self.get_model_inputs(conversation)
+        _current_conversation = copy.deepcopy(self.conversation)
+        _current_conversation.append({"role": "user", "content": prompt})
+        model_inputs = self.get_model_inputs(_current_conversation)
 
         if generation_kwargs:
             generation_params = {**generation_kwargs}
@@ -457,7 +510,8 @@ class LLM(BaseLLM):
 
         response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-        self.chat_history.append((prompt, response))
+        self.conversation.append({"role": "user", "content": prompt})
+        self.conversation.append({"role": "assistant", "content": response})
 
         del model_inputs
         del generated_ids
